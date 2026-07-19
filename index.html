@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마음 나침반 - 감정 기반 선택 도우미</title>
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #4A90E2;
+      --bg-color: #F4F7FC;
+      --card-bg: #FFFFFF;
+      --text-main: #333333;
+      --text-muted: #777777;
+    }
+    
+    body {
+      font-family: 'Pretendard', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    h1 {
+      font-size: 24px;
+      color: var(--primary-color);
+      text-align: center;
+      margin-top: 0;
+      margin-bottom: 24px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #E0E5EC;
+      border-radius: 8px;
+      font-family: 'Pretendard', sans-serif;
+      font-size: 15px;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    button {
+      width: 100%;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    button:hover {
+      background-color: #357ABD;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    #loading {
+      display: none;
+      text-align: center;
+      color: var(--primary-color);
+      font-weight: 600;
+      margin-top: 20px;
+    }
+
+    #result-section {
+      display: none;
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    .result-choice {
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--primary-color);
+      text-align: center;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px dashed #E0E5EC;
+    }
+
+    .result-reason {
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- 위쪽 상단 : 입력 섹션 -->
+    <div class="card">
+      <h1>마음 나침반 🧭</h1>
+      
+      <div class="input-group">
+        <label>선택지 A</label>
+        <input type="text" id="optionA" placeholder="예: 오늘 밤새서 작업하기">
+      </div>
+      
+      <div class="input-group">
+        <label>선택지 B</label>
+        <input type="text" id="optionB" placeholder="예: 일단 푹 자고 내일 아침에 하기">
+      </div>
+      
+      <div class="input-group">
+        <label>지금 나의 감정 / 상황</label>
+        <textarea id="emotion" placeholder="예: 몸이 너무 피곤하고 지쳐서 의욕이 안 나. 하지만 기한이 얼마 안 남아서 불안해."></textarea>
+      </div>
+
+      <button id="submitBtn">어느 쪽이 좋을까요?</button>
+      <div id="loading">마음을 읽으며 고민하는 중... 💭</div>
+    </div>
+
+    <!-- 아래쪽 : 출력 섹션 -->
+    <div class="card" id="result-section">
+      <div class="result-choice" id="resultChoice"></div>
+      <div class="result-reason" id="resultReason"></div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const optionA = document.getElementById('optionA').value.trim();
+      const optionB = document.getElementById('optionB').value.trim();
+      const emotion = document.getElementById('emotion').value.trim();
+
+      if (!optionA || !optionB || !emotion) {
+        alert("선택지와 감정을 모두 입력해주세요!");
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      const loading = document.getElementById('loading');
+      const resultSection = document.getElementById('result-section');
+
+      // UI 상태 업데이트 (로딩 중)
+      btn.style.display = 'none';
+      resultSection.style.display = 'none';
+      loading.style.display = 'block';
+
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ optionA, optionB, emotion })
+        });
+
+        if (!response.ok) throw new Error('API 호출 실패');
+
+        const data = await response.json();
+        
+        // 결과 렌더링
+        document.getElementById('resultChoice').innerText = `✨ 추천: ${data.choice}`;
+        document.getElementById('resultReason').innerText = data.reason;
+        
+        resultSection.style.display = 'block';
+      } catch (error) {
+        alert("결과를 가져오는 중 오류가 발생했습니다.");
+        console.error(error);
+      } finally {
+        // UI 상태 복구
+        loading.style.display = 'none';
+        btn.style.display = 'block';
+        btn.innerText = '다시 물어보기';
+      }
+    });
+  </script>
+</body>
+</html>
