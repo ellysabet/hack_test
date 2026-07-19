@@ -141,14 +141,14 @@
       font-size: 15px;
     }
 
-    /* 게시판(히스토리) 영역 스타일 추가 */
-    #history-list {
+    /* 게시판 영역 스타일 */
+    #opinion-list {
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
 
-    .history-item {
+    .opinion-item {
       background: #F9FAFC;
       border: 1px solid #E0E5EC;
       padding: 16px;
@@ -157,16 +157,24 @@
       line-height: 1.5;
     }
 
-    .history-item .options {
+    .opinion-item .author {
       font-weight: 600;
       color: var(--text-main);
       margin-bottom: 6px;
+      font-size: 13px;
+    }
+    
+    .opinion-item .date {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: normal;
+      margin-left: 8px;
     }
 
-    .history-item .choice {
-      color: var(--primary-color);
-      font-weight: bold;
-      margin-top: 8px;
+    .opinion-item .content {
+      color: var(--text-main);
+      margin-top: 4px;
+      white-space: pre-wrap;
     }
 
     @keyframes fadeIn {
@@ -178,7 +186,7 @@
 <body>
 
   <div class="container">
-    <!-- 입력 섹션 -->
+    <!-- 입력 섹션 (나침반) -->
     <div class="card">
       <h1>마음 나침반 🧭</h1>
       
@@ -206,23 +214,35 @@
       <div class="result-choice" id="resultChoice"></div>
       <div class="result-reason" id="resultReason"></div>
     </div>
+    
+    <!-- 사용자 의견 입력 섹션 추가 -->
+    <div class="card">
+      <h2>의견 남기기 ✍️</h2>
+      <div class="input-group">
+        <label>닉네임 (선택)</label>
+        <input type="text" id="userName" placeholder="예: 익명">
+      </div>
+      <div class="input-group">
+        <label>앱 사용 후기 및 바라는 점</label>
+        <textarea id="userOpinion" placeholder="자유롭게 의견을 남겨주세요!"></textarea>
+      </div>
+      <button id="submitOpinionBtn">의견 등록하기</button>
+    </div>
 
-    <!-- 게시판(기록) 섹션 추가 -->
-    <div class="card" id="history-section">
-      <h2>지난 고민 기록 📝</h2>
-      <div id="history-list">
+    <!-- 게시판(사용자 의견) 섹션 -->
+    <div class="card" id="opinion-board-section">
+      <h2>사용자 의견 게시판 💬</h2>
+      <div id="opinion-list">
         <!-- Firestore 데이터가 여기에 들어옵니다 -->
       </div>
     </div>
   </div>
 
-  <!-- Firebase 연동을 위해 type="module" 적용 -->
+  <!-- Firebase 연동 -->
   <script type="module">
-    // Firebase SDK v9+ 가져오기
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // 입력해주신 firebaseConfig 적용
     const firebaseConfig = {
       apiKey: "AIzaSyCxpt2bUhwbbVzdHSqcVqssYkfAXHGdRKE",
       authDomain: "hacktest2-d7818.firebaseapp.com",
@@ -232,51 +252,94 @@
       appId: "1:209123022156:web:feff81d569beb23d562be9"
     };
 
-    // Firebase 초기화
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // DOM 요소
     const btn = document.getElementById('submitBtn');
     const loading = document.getElementById('loading');
     const resultSection = document.getElementById('result-section');
-    const historyList = document.getElementById('history-list');
+    const opinionList = document.getElementById('opinion-list');
+    const submitOpinionBtn = document.getElementById('submitOpinionBtn');
 
-    // 게시판(기록) 불러오기 함수
-    async function loadHistory() {
-      historyList.innerHTML = '<div style="text-align:center; color:#777;">기록을 불러오는 중...</div>';
+    // 게시판(사용자 의견) 불러오기 함수
+    async function loadOpinions() {
+      opinionList.innerHTML = '<div style="text-align:center; color:#777;">의견을 불러오는 중...</div>';
       try {
-        // 최신순(내림차순) 정렬 쿼리 생성
-        const q = query(collection(db, "decisions"), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "opinions"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         
-        historyList.innerHTML = '';
+        opinionList.innerHTML = '';
         
         if(querySnapshot.empty) {
-          historyList.innerHTML = '<div style="text-align:center; color:#777;">아직 고민 기록이 없습니다.</div>';
+          opinionList.innerHTML = '<div style="text-align:center; color:#777;">아직 등록된 의견이 없습니다. 첫 번째 의견을 남겨주세요!</div>';
           return;
         }
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           const div = document.createElement('div');
-          div.className = 'history-item';
+          div.className = 'opinion-item';
+          
+          // 시간 포맷팅
+          let dateString = '';
+          if(data.createdAt) {
+            const date = data.createdAt.toDate();
+            dateString = `${date.getFullYear()}.${date.getMonth()+1}.${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+          }
+
           div.innerHTML = `
-            <div class="options">🤔 A: ${data.optionA} vs B: ${data.optionB}</div>
-            <div class="choice">✨ 선택: ${data.choice}</div>
+            <div class="author">${data.name || '익명'} <span class="date">${dateString}</span></div>
+            <div class="content">${data.text}</div>
           `;
-          historyList.appendChild(div);
+          opinionList.appendChild(div);
         });
       } catch (error) {
         console.error("Firebase 데이터 불러오기 에러:", error);
-        historyList.innerHTML = '<div style="text-align:center; color:red;">기록을 불러오지 못했습니다. Firestore 규칙을 확인해주세요.</div>';
+        opinionList.innerHTML = '<div style="text-align:center; color:red;">의견을 불러오지 못했습니다.</div>';
       }
     }
 
-    // 페이지 접속 시 기존 데이터 불러오기
-    loadHistory();
+    // 페이지 접속 시 의견 게시판 데이터 불러오기
+    loadOpinions();
 
-    // 등록(결과 확인) 버튼 이벤트
+    // 의견 등록 버튼 이벤트
+    submitOpinionBtn.addEventListener('click', async () => {
+      let name = document.getElementById('userName').value.trim();
+      const text = document.getElementById('userOpinion').value.trim();
+
+      if (!text) {
+        alert("의견 내용을 입력해주세요!");
+        return;
+      }
+      
+      if (!name) name = "익명";
+
+      submitOpinionBtn.disabled = true;
+      submitOpinionBtn.innerText = '등록 중...';
+
+      try {
+        await addDoc(collection(db, "opinions"), {
+          name: name,
+          text: text,
+          createdAt: serverTimestamp()
+        });
+
+        document.getElementById('userName').value = '';
+        document.getElementById('userOpinion').value = '';
+        
+        alert("의견이 등록되었습니다. 감사합니다!");
+        await loadOpinions(); // 게시판 새로고침
+
+      } catch (error) {
+        alert("의견 등록 중 오류가 발생했습니다.");
+        console.error(error);
+      } finally {
+        submitOpinionBtn.disabled = false;
+        submitOpinionBtn.innerText = '의견 등록하기';
+      }
+    });
+
+    // 기존 결과 확인(Gemini API 호출) 버튼 이벤트
     btn.addEventListener('click', async () => {
       const optionA = document.getElementById('optionA').value.trim();
       const optionB = document.getElementById('optionB').value.trim();
@@ -292,7 +355,6 @@
       loading.style.display = 'block';
 
       try {
-        // 기존 1번, 2번 규칙 유지 (서버리스 API 호출)
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -305,28 +367,9 @@
           throw new Error(data.error || 'API 호출 실패');
         }
         
-        // 화면에 결과 렌더링
         document.getElementById('resultChoice').innerText = `✨ 추천: ${data.choice}`;
         document.getElementById('resultReason').innerText = data.reason;
         resultSection.style.display = 'block';
-
-        // Firebase에 결과 저장하기
-        await addDoc(collection(db, "decisions"), {
-          optionA: optionA,
-          optionB: optionB,
-          emotion: emotion,
-          choice: data.choice,
-          reason: data.reason,
-          createdAt: serverTimestamp() // 최신순 정렬을 위한 타임스탬프
-        });
-
-        // 저장 후 게시판 최신화
-        await loadHistory();
-
-        // 입력창 초기화
-        document.getElementById('optionA').value = '';
-        document.getElementById('optionB').value = '';
-        document.getElementById('emotion').value = '';
 
       } catch (error) {
         alert("처리 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
