@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // POST 요청만 허용
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -8,10 +7,9 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY is not set' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY가 설정되지 않았습니다. Vercel 환경변수를 확인해주세요.' });
   }
 
-  // Gemini에게 내릴 프롬프트 작성
   const prompt = `사용자가 두 가지 선택을 두고 고민하고 있습니다.
   - 선택지 A: ${optionA}
   - 선택지 B: ${optionB}
@@ -26,7 +24,6 @@ export default async function handler(req, res) {
   }`;
 
   try {
-    // Gemini 2.5 Flash API 호출
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
@@ -35,7 +32,6 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { 
-          // 응답을 깔끔하게 JSON 객체로 받기 위한 설정
           responseMimeType: "application/json" 
         }
       })
@@ -43,13 +39,18 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     
-    // Gemini의 텍스트 응답 추출 후 JSON 파싱
+    // 🔥 추가된 에러 방어 로직: API가 정상(200)이 아니면 상세 에러를 로그에 출력합니다.
+    if (!response.ok) {
+      console.error("Gemini API Error Details:", JSON.stringify(data, null, 2));
+      return res.status(500).json({ error: 'Gemini API 호출 중 문제가 발생했습니다.', details: data });
+    }
+
     const resultText = data.candidates[0].content.parts[0].text;
     const resultJson = JSON.parse(resultText);
 
     res.status(200).json(resultJson);
   } catch (error) {
-    console.error('Gemini API Error:', error);
-    res.status(500).json({ error: 'Failed to generate response' });
+    console.error('Server Logic Error:', error);
+    res.status(500).json({ error: '서버 로직 처리 중 에러가 발생했습니다.', message: error.message });
   }
 }
